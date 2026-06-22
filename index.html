@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOC · Single Pane of Glass — Prototype</title>
+<style>
+  :root{
+    --bg:#f3f5f8; --surface:#fff; --ink:#19212e; --ink-2:#5a6477; --ink-3:#9099aa;
+    --line:#e3e7ee; --line-2:#eef1f5; --rail:#1c2433; --rail-ink:#c2cad8; --rail-active:#2b3850;
+    --blue:#2f6fde; --blue-soft:#ecf2fd;
+    --red:#cf3a31; --red-soft:#fcecea; --red-line:#f3cbc6;
+    --amber:#b5740a; --amber-soft:#fdf3e2; --amber-line:#f0debb;
+    --green:#1d7a4d; --green-soft:#e7f5ed;
+    --radius:10px; --radius-s:7px;
+    --shadow:0 1px 2px rgba(20,30,50,.05),0 3px 10px rgba(20,30,50,.045);
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  a{color:var(--blue)}
+  .app{display:grid;grid-template-columns:228px 1fr;min-height:100vh}
+
+  /* ---------- rail ---------- */
+  .rail{background:var(--rail);color:var(--rail-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .brand{padding:17px 18px 15px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .brand .logo{display:flex;align-items:center;gap:9px;font-weight:700;color:#fff;font-size:14px}
+  .brand .dot{width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,#4f8cff,#7b61ff)}
+  .brand .sub{font-size:10px;letter-spacing:.5px;text-transform:uppercase;margin-top:6px;color:#7e889b}
+  .rail-section{padding:15px 14px 5px;font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:#6b7589}
+  .role-btn{display:flex;flex-direction:column;width:calc(100% - 16px);margin:3px 8px;padding:8px 11px;background:transparent;border:1px solid transparent;border-radius:var(--radius-s);color:var(--rail-ink);text-align:left}
+  .role-btn .r-name{font-size:12.5px;font-weight:600;color:#e7ebf3}
+  .role-btn .r-meta{font-size:10.5px;color:#828ea3;margin-top:1px}
+  .role-btn:hover{background:rgba(255,255,255,.05)}
+  .role-btn.active{background:var(--rail-active);border-color:rgba(255,255,255,.10)}
+  .role-btn.active .r-name{color:#fff}
+  .nav{margin-top:7px;display:flex;flex-direction:column;gap:1px;padding:0 8px}
+  .nav a{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:var(--radius-s);color:var(--rail-ink);font-size:12.5px;text-decoration:none}
+  .nav a:hover{background:rgba(255,255,255,.05)}
+  .nav a.on{background:rgba(255,255,255,.08);color:#fff;font-weight:600}
+  .nav a .ico{width:16px;text-align:center;opacity:.85}
+  .rail-foot{margin-top:auto;padding:13px 15px;border-top:1px solid rgba(255,255,255,.08);font-size:10.5px;color:#727d90;line-height:1.5}
+
+  /* ---------- topbar ---------- */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .topbar{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:11px 22px}
+  .crumb{font-size:12.5px;color:var(--ink-3)}.crumb b{color:var(--ink);font-weight:600}
+  .sys{margin-left:auto;display:flex;align-items:center;gap:13px;font-size:11px;color:var(--ink-2)}
+  .sys .s{display:flex;align-items:center;gap:5px}
+  .sys .live{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+  .bell{position:relative;border:1px solid var(--line);background:var(--surface);width:36px;height:36px;border-radius:9px;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .bell:hover{background:#f7f8fa}
+  .bell .badge{position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff}
+  .bell .ping{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--red);opacity:.6;animation:ping 1.4s cubic-bezier(0,0,.2,1) infinite}
+  @keyframes ping{75%,100%{transform:scale(2);opacity:0}}
+
+  /* ---------- notif panel ---------- */
+  .notif{position:fixed;top:60px;right:20px;width:380px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 50px rgba(15,23,42,.22);z-index:60;display:none;overflow:hidden}
+  .notif.show{display:block}
+  .notif-h{padding:13px 16px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}
+  .notif-h .ct{margin-left:auto;font-size:11px;color:var(--ink-3);font-weight:500}
+  .notif-list{max-height:60vh;overflow:auto}
+  .nrow{display:flex;gap:11px;padding:12px 16px;border-bottom:1px solid var(--line-2);cursor:pointer}
+  .nrow:hover{background:#fafbfc}.nrow:last-child{border-bottom:0}
+  .nrow .nbar{width:4px;border-radius:3px;flex-shrink:0}
+  .nrow.critical .nbar,.nrow.breached .nbar{background:var(--red)}
+  .nrow.warning .nbar{background:var(--amber)}.nrow.watch .nbar{background:var(--ink-3)}
+  .nrow .ntitle{font-weight:600;font-size:12.5px}
+  .nrow .nmeta{font-size:11px;color:var(--ink-2);margin-top:2px}
+  .ntier{font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:4px;display:inline-block;margin-top:6px}
+  .ntier.critical,.ntier.breached{background:var(--red-soft);color:var(--red)}
+  .ntier.warning{background:var(--amber-soft);color:var(--amber)}.ntier.watch{background:#eef0f3;color:#5a647a}
+  .nrow .nclock{margin-left:auto;font-family:var(--mono);font-weight:700;font-size:12.5px;text-align:right;white-space:nowrap}
+  .nclock.red{color:var(--red)}.nclock.amber{color:var(--amber)}
+
+  /* ---------- content ---------- */
+  .content{padding:20px 24px 70px;max-width:1280px;width:100%}
+  .page-head h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.3px}
+  .page-sub{color:var(--ink-2);font-size:12.5px;margin:4px 0 18px;max-width:760px}
+  .section-label{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-3);margin:26px 0 11px;display:flex;align-items:center;gap:9px}
+  .section-label .ln{flex:1;height:1px;background:var(--line)}
+
+  /* ---------- proactive breach band (top hierarchy) ---------- */
+  .breach{background:linear-gradient(180deg,#fff 0%,var(--red-soft) 100%);border:1px solid var(--red-line);border-left:4px solid var(--red);border-radius:var(--radius);padding:16px 18px;display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;box-shadow:var(--shadow);margin-bottom:6px}
+  .breach .ey{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--red)}
+  .breach .pdot{width:9px;height:9px;border-radius:50%;background:var(--red);position:relative}
+  .breach .pdot::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--red);animation:ping 1.5s ease-out infinite}
+  .breach h2{font-size:16px;margin:8px 0 4px;font-weight:700}
+  .breach .why{font-size:12.5px;color:#7a3b36}
+  .breach .meta{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+  .breach .clockwrap{text-align:center;padding-left:18px;border-left:1px solid var(--red-line)}
+  .breach .clk{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--red);line-height:1;letter-spacing:-1px}
+  .breach .clk-l{font-size:10.5px;color:#9a5a55;margin-top:5px;letter-spacing:.3px}
+  .breach .acts{grid-column:1 / -1;display:flex;gap:8px;flex-wrap:wrap;padding-top:13px;margin-top:2px;border-top:1px solid var(--red-line)}
+  @media(max-width:720px){.breach{grid-template-columns:1fr}.breach .clockwrap{border-left:0;border-top:1px solid var(--red-line);padding:12px 0 0;text-align:left}}
+  .slabar{display:flex;align-items:center;gap:11px;background:var(--amber-soft);border:1px solid var(--amber-line);border-radius:var(--radius);padding:11px 15px;margin-top:10px;font-size:12.5px;color:#7a5310}
+  .slabar .si{font-size:15px}.slabar b{color:#5e3f0a}.slabar .btn{margin-left:auto;background:#fff}
+
+  /* ---------- toolbar (search + filter) ---------- */
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;box-shadow:var(--shadow)}
+  .search-lg{flex:1;min-width:230px;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 13px}
+  .search-lg:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft);background:#fff}
+  .search-lg input{border:0;background:transparent;outline:0;font-family:inherit;font-size:13px;color:var(--ink);width:100%}
+  .fsel{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}
+  .fsel select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:12.5px;background:var(--surface);color:var(--ink);outline:0}
+  .fsel select:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+  .rescount{font-size:11.5px;color:var(--ink-3);margin-left:auto;white-space:nowrap}
+
+  /* ---------- segmented buckets ---------- */
+  .seg{display:inline-flex;background:#e9edf3;border-radius:9px;padding:3px;gap:2px;margin:16px 0 14px;flex-wrap:wrap}
+  .seg button{border:0;background:transparent;padding:8px 15px;border-radius:7px;font-weight:600;font-size:12.5px;color:var(--ink-2);display:flex;gap:8px;align-items:center}
+  .seg button:hover{color:var(--ink)}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
+  .seg .cnt{font-size:11px;font-weight:700;padding:1px 8px;border-radius:11px;background:#d8deea;color:#4b5567}
+  .seg button.on.b-jeop .cnt{background:var(--red-soft);color:var(--red)}
+  .seg button.on.b-risk .cnt{background:var(--amber-soft);color:var(--amber)}
+  .seg button.on.b-un .cnt{background:var(--blue-soft);color:var(--blue)}
+  .seg button.on.b-ip .cnt{background:var(--green-soft);color:var(--green)}
+
+  /* ---------- WO cards ---------- */
+  .wolist{display:flex;flex-direction:column;gap:10px}
+  .wo{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;border-left:3px solid var(--ink-3)}
+  .wo.p1{border-left-color:var(--red)}.wo.p2{border-left-color:var(--amber)}.wo.p3{border-left-color:#aeb6c4}
+  .wo-top{display:flex;align-items:flex-start;gap:11px}
+  .wo-top .lead{min-width:0;flex:1}
+  .wo-id{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+  .wo-desc{font-weight:600;font-size:13.5px;margin-top:1px}
+  .wo-right{text-align:right;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+  .wo-clock{font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:-.3px}
+  .wo-clock.red{color:var(--red)}.wo-clock.amber{color:var(--amber)}.wo-clock.green{color:var(--green)}
+  .wo-clock-l{font-size:10px;color:var(--ink-3)}
+  .wo-due{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+  .pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.3px;flex-shrink:0}
+  .pill.p1{background:var(--red-soft);color:var(--red)}.pill.p2{background:var(--amber-soft);color:var(--amber)}.pill.p3{background:#eef0f3;color:#5a647a}
+  .chip{font-size:10.5px;padding:2px 8px;border-radius:20px;background:#eef1f5;color:#566074;font-weight:500}
+  .chip.absent{background:var(--amber-soft);color:var(--amber)}
+  .reason{display:flex;gap:8px;margin-top:11px;padding:9px 11px;background:#fafbfc;border:1px solid var(--line-2);border-left:3px solid var(--amber);border-radius:6px;font-size:12px;color:var(--ink-2)}
+  .reason.jeop{border-left-color:var(--red)}
+  .reason .rk{font-weight:600;color:var(--ink);white-space:nowrap}
+  .happened{margin-top:9px;font-size:12.5px;color:var(--ink-2);line-height:1.55}
+  .wo-foot{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .wo-foot .acts{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
+  .wo-due-chip{font-size:11px;color:var(--ink-2);font-weight:500}
+  .actbar{margin-left:auto;position:relative}
+  .menu{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(15,23,42,.16);min-width:214px;padding:6px;z-index:50;display:none}
+  .menu.show{display:block}
+  .menu .mh{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);font-weight:700;padding:7px 9px 3px}
+  .menu .mi{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;padding:8px 9px;border-radius:7px;font-size:12.5px;color:var(--ink)}
+  .menu .mi:hover{background:#f4f6f9}
+  .menu .mi.danger{color:var(--red)}
+  .menu .mi .mic{width:15px;text-align:center;opacity:.75;font-size:12px}
+  .menu .mdiv{height:1px;background:var(--line-2);margin:5px 5px}
+  /* cases lens */
+  .pipe{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+  .pipe-i{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 12px;font-size:12px;color:var(--ink-2);font-weight:600}
+  .pipe-i:hover{background:#f7f8fa}
+  .pipe-i.on{border-color:var(--blue);background:var(--blue-soft);color:var(--ink)}
+  .pipe-i .dotc{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .pipe-i .pc{font-size:11px;font-weight:700;background:#eef1f5;color:#48526a;border-radius:10px;padding:1px 8px}
+  .pipe-i.on .pc{background:#fff}
+  .stp{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
+  .st-un{background:#eef1f5;color:#5a647a}.st-pa{background:#eae6fb;color:#5a3aa8}.st-wc{background:#e7f0fb;color:#21528f}
+  .st-ip{background:#e2f0ea;color:#1d6a45}.st-oh{background:var(--amber-soft);color:var(--amber)}.st-cx{background:var(--red-soft);color:var(--red)}.st-cp{background:#eef1f5;color:#7a8497}
+  table.cases{table-layout:fixed;width:100%}
+  table.cases th,table.cases td{text-align:left;vertical-align:middle;padding:12px 14px}
+  table.cases th:last-child,table.cases td.c-act{text-align:right;white-space:nowrap}
+  table.cases td:nth-child(3),table.cases td:nth-child(4){white-space:nowrap}
+  .crow{cursor:pointer}
+  .crow:hover{background:#fafbfc}
+  .crow-desc{font-weight:600;font-size:13px}
+  .crow-id{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-top:2px}
+  .cases-empty{padding:34px;text-align:center;color:var(--ink-3);display:flex;flex-direction:column;gap:13px;align-items:center}
+  .ftokens{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .ftlabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3)}
+  .ftoken{display:inline-flex;align-items:center;gap:7px;background:var(--blue-soft);color:#21528f;border:1px solid #cfe0fa;border-radius:20px;padding:4px 6px 4px 11px;font-size:11.5px;font-weight:600}
+  .ftx{border:0;background:#fff;color:#21528f;width:17px;height:17px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .ftx:hover{background:#dce9fb}
+  .lookup-bar{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 18px;box-shadow:var(--shadow);width:100%}
+  .lookup-bar:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+  .lookup-bar .mag{font-size:17px;color:var(--ink-3)}
+  .lookup-input{flex:1;border:0;outline:0;font-family:inherit;font-size:15px;color:var(--ink);background:transparent}
+  .lookup-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+  .cancel-btn{color:var(--red);border-color:#f0cdca}.cancel-btn:hover{background:var(--red-soft)}
+  .seg.lens{margin:14px 0 2px}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+  .btn:hover{background:#f7f8fa}
+  .btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}.btn.pri:hover{background:#2660c8}
+  .btn.danger{background:var(--red);border-color:var(--red);color:#fff}.btn.danger:hover{background:#bb332b}
+  .btn.sm{padding:5px 10px;font-size:11px}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--blue)}.btn.ghost:hover{background:var(--blue-soft)}
+  .btn .ic{font-size:11px;opacity:.9}
+
+  /* queue health */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .card-h{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line-2)}
+  .card-h h2{font-size:13.5px;margin:0;font-weight:700}
+  .card-h .ct{font-size:11px;color:var(--ink-3);margin-left:auto}
+  .qgrid{display:grid;grid-template-columns:1fr 1fr}
+  .qcol{padding:13px 16px}.qcol+.qcol{border-left:1px solid var(--line-2)}
+  .qcol h3{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-3);margin:0 0 9px}
+  .qrow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;font-size:12.5px}
+  .qrow .qk{color:var(--ink-2)}
+  .qrow .qv{font-weight:700;font-variant-numeric:tabular-nums}
+  .qrow .qv .t{font-weight:400;color:var(--ink-3);font-size:11px}
+  .qv.bad{color:var(--red)}.qv.warn{color:var(--amber)}.qv.good{color:var(--green)}
+
+  .srcbadge{font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+  .srcbadge.genesys{background:#e7f0fb;color:#1f5aa8}.srcbadge.sap{background:#e7f5ed;color:#1d6a45}
+  .srcbadge.fsm{background:#fcefe0;color:#9a5d05}.srcbadge.spog{background:#eceff3;color:#48526a}
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px}
+  .tag.native{background:#eceff3;color:#48526a}.tag.sync{background:var(--blue-soft);color:#21528f}.tag.open{background:#f1ecfb;color:#5a3aa8}
+
+  /* legend */
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--ink-2);margin:14px 2px 0}
+  .legend .li{display:flex;align-items:center;gap:6px}
+
+  /* two-col (RM) */
+  .grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;align-items:start}
+  @media(max-width:1040px){.grid-2{grid-template-columns:1fr}}
+  .rj{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line-2);align-items:flex-start}
+  .rj:last-child{border-bottom:0}
+  .rj .ri{width:24px;height:24px;border-radius:6px;background:var(--red-soft);color:var(--red);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;font-size:12px}
+  .rj .rt{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+  .av{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line-2)}
+  .av:last-child{border-bottom:0}
+  .av .an{font-weight:600;font-size:12.5px}.av .am{font-size:11px;color:var(--ink-2);margin-top:2px}
+  .sd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+  .sd.free{background:var(--green)}.sd.busy{background:var(--amber)}.sd.off{background:var(--ink-3)}
+
+  /* ---------- case timeline ---------- */
+  .back{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--blue);font-size:12.5px;font-weight:600;padding:0;margin-bottom:12px}
+  .case-head{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:18px}
+  .case-head .r1{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+  .case-head h1{font-size:17px;margin:0;font-weight:700}
+  .case-head .cid{font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
+  .case-head .sla{margin-left:auto;text-align:right}
+  .case-head .sla .big{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--red)}
+  .case-head .sla .big.ok{color:var(--green)}
+  .case-head .sla .l{font-size:10.5px;color:var(--ink-3)}
+  .case-head .r2{display:flex;gap:26px;margin-top:13px;flex-wrap:wrap}
+  .kv .kk{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-3)}
+  .kv .vv{font-weight:600;margin-top:2px;font-size:12.5px}
+  .stages{display:flex;margin-top:15px;border-top:1px solid var(--line-2);padding-top:14px;flex-wrap:wrap}
+  .stage{flex:1;min-width:74px;text-align:center;position:relative;font-size:9.5px;color:var(--ink-3)}
+  .stage .sd2{width:12px;height:12px;border-radius:50%;background:#dde2ea;margin:0 auto 6px;box-shadow:0 0 0 2px #fff,0 0 0 3px var(--line)}
+  .stage.done .sd2{background:var(--green);box-shadow:0 0 0 2px #fff,0 0 0 3px #bfe0cd}
+  .stage.curr .sd2{background:var(--blue);box-shadow:0 0 0 2px #fff,0 0 0 5px var(--blue-soft)}
+  .stage.curr{color:var(--blue);font-weight:700}
+  .stage::before{content:"";position:absolute;top:5px;left:-50%;width:100%;height:2px;background:#e4e8ee;z-index:-1}
+  .stage:first-child::before{display:none}.stage.done::before,.stage.curr::before{background:#bfe0cd}
+  .case-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+  /* parcel-tracking style progress */
+  .track{position:relative;margin-top:18px;padding:4px 0 2px}
+  .track-line{position:absolute;top:21px;left:10%;right:10%;height:3px;background:var(--line);border-radius:2px;z-index:1}
+  .track-fill{height:100%;background:var(--green);border-radius:2px;width:0;transition:width .7s ease}
+  .track-steps{display:flex;position:relative;z-index:2}
+  .tstep{flex:1;text-align:center}
+  .tnode2{width:30px;height:30px;border-radius:50%;background:#fff;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:13px;color:var(--ink-3);font-weight:700;position:relative}
+  .tstep.done .tnode2,.tstep.last .tnode2{background:var(--green);border-color:var(--green);color:#fff}
+  .tstep.current .tnode2{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 0 0 5px var(--blue-soft)}
+  .tstep.current.hold .tnode2{background:var(--amber);border-color:var(--amber);box-shadow:0 0 0 5px var(--amber-soft)}
+  .tstep.current .tnode2::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--blue);animation:ping 1.7s ease-out infinite}
+  .tstep.current.hold .tnode2::after{border-color:var(--amber)}
+  .tlabel{font-size:11.5px;font-weight:600;color:var(--ink-2)}
+  .tstep.current .tlabel{color:var(--ink)}.tstep.future .tlabel{color:var(--ink-3)}
+  .tsub{font-size:10px;color:var(--ink-3);margin-top:3px;text-transform:uppercase;letter-spacing:.3px}
+  .tstep.current .tsub{color:var(--blue);font-weight:700}
+
+  .case-wrap{display:grid;grid-template-columns:1fr 330px;gap:18px;align-items:start}
+  @media(max-width:1040px){.case-wrap{grid-template-columns:1fr}}
+
+  /* the timeline itself */
+  .timeline{position:relative;padding:6px 0 6px 8px;margin-left:8px}
+  .timeline::before{content:"";position:absolute;left:11px;top:14px;bottom:14px;width:2px;background:var(--line)}
+  .tev{position:relative;padding:0 0 20px 40px}
+  .tev:last-child{padding-bottom:2px}
+  .tnode{position:absolute;left:1px;top:1px;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;z-index:1}
+  .tnode.genesys{border-color:#7ea8e0;color:#1f5aa8}.tnode.sap{border-color:#6fc295;color:#1d6a45}
+  .tnode.fsm{border-color:#e6b56a;color:#9a5d05}.tnode.spog{border-color:#aab2c0;color:#48526a}
+  .tev.alert .tnode{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+  .tcard{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:11px 13px;box-shadow:var(--shadow)}
+  .tev.alert .tcard{border-color:var(--red-line);background:#fffafa}
+  .tcard .th{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .tcard .ttime{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+  .tcard .ttitle{font-weight:600;font-size:12.5px}
+  .tev.alert .ttitle{color:var(--red)}
+  .tcard .tbody{font-size:12px;color:var(--ink-2);margin-top:5px;line-height:1.5}
+  .tcard .treason{margin-top:9px;font-size:11.5px;background:#fafbfc;border:1px solid var(--line-2);border-left:3px solid var(--amber);border-radius:5px;padding:7px 9px;color:var(--ink-2)}
+  .tev.alert .treason{border-left-color:var(--red)}
+  .treason b{color:var(--ink)}
+
+  /* side panels */
+  .side .card{margin-bottom:16px}
+  .note{padding:10px 13px;border-bottom:1px solid var(--line-2);font-size:12px}
+  .note:last-child{border-bottom:0}
+  .note .nh{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+  .note .who{font-weight:600;font-size:11.5px}
+  .note .vis{font-size:9.5px;background:#eef0f3;color:#566074;padding:1px 6px;border-radius:10px;font-weight:600}
+  .note .nt{font-size:10px;color:var(--ink-3);margin-left:auto}
+  .note .nb{color:var(--ink-2)}
+  .note-form{padding:12px 13px;border-top:1px solid var(--line-2);display:flex;flex-direction:column;gap:8px}
+  textarea,select.fld,input.fld{width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-family:inherit;font-size:12.5px;color:var(--ink);outline:0;background:var(--surface)}
+  textarea:focus,select.fld:focus,input.fld:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+  .comms{padding:12px 14px;font-size:12px}
+  .comms .meaningless{background:var(--red-soft);color:var(--red);font-size:10px;padding:2px 7px;border-radius:5px;font-weight:600}
+
+  /* modal */
+  .scrim{position:fixed;inset:0;background:rgba(18,26,42,.44);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
+  .scrim.show{display:flex}
+  .modal{background:var(--surface);border-radius:14px;width:100%;max-width:470px;box-shadow:0 24px 64px rgba(15,23,42,.32);overflow:hidden;animation:pop .15s ease}
+  @keyframes pop{from{transform:translateY(8px) scale(.985);opacity:0}to{transform:none;opacity:1}}
+  .modal-h{padding:16px 19px;border-bottom:1px solid var(--line-2)}
+  .modal-h h3{margin:0;font-size:15px}.modal-h p{margin:5px 0 0;font-size:12px;color:var(--ink-2)}
+  .modal-b{padding:16px 19px;display:flex;flex-direction:column;gap:13px}
+  .field label{font-size:11px;font-weight:600;color:var(--ink-2);display:block;margin-bottom:5px}
+  .req{color:var(--red)}
+  .modal-f{padding:13px 19px;border-top:1px solid var(--line-2);display:flex;gap:9px;justify-content:flex-end;align-items:center}
+  .modal-f .nl{margin-right:auto;font-size:11px}
+
+  /* toast */
+  .toasts{position:fixed;bottom:22px;right:22px;z-index:90;display:flex;flex-direction:column;gap:9px}
+  .toast{background:#1c2433;color:#fff;padding:11px 15px;border-radius:10px;font-size:12.5px;box-shadow:0 12px 34px rgba(15,23,42,.36);display:flex;align-items:center;gap:10px;max-width:350px;animation:sl .2s ease}
+  @keyframes sl{from{transform:translateX(18px);opacity:0}to{transform:none;opacity:1}}
+  .toast .td{width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0}
+  .toast .sn{font-family:var(--mono);font-size:11px;color:#9fb4d6;margin-top:2px}
+  .muted{color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><div class="logo"><span class="dot"></span>VOC</div><div class="sub">Single Pane of Glass</div></div>
+    <div class="rail-section">Viewing as</div>
+    <button class="role-btn active" data-role="lead" onclick="setRole('lead')"><span class="r-name">CX Team Leader</span><span class="r-meta">Cross-contract command</span></button>
+    <button class="role-btn" data-role="rm" onclick="setRole('rm')"><span class="r-name">RM · Dispatch Operator</span><span class="r-meta">Jeopardy &amp; dispatch</span></button>
+    <button class="role-btn" data-role="cx" onclick="setRole('cx')"><span class="r-name">CX Coordinator</span><span class="r-meta">Status lookup (drop-in)</span></button>
+    <div class="rail-section" style="margin-top:5px">Workspace</div>
+    <nav class="nav" id="nav"></nav>
+    <div class="rail-foot">Experience layer over Genesys · SAP Service Cloud · SAP FSM. No source system replicated.</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumb" id="crumb"><b>Command view</b></div>
+      <div class="sys">
+        <span class="s"><span class="live"></span>Genesys</span>
+        <span class="s"><span class="live"></span>SAP Service Cloud</span>
+        <span class="s"><span class="live"></span>SAP FSM</span>
+      </div>
+      <button class="bell" onclick="toggleNotif(event)">🔔<span class="ping"></span><span class="badge" id="notifBadge">5</span></button>
+    </header>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<div class="notif" id="notif">
+  <div class="notif-h">Proactive alerts<span class="ct" id="notifSub"></span></div>
+  <div class="notif-list" id="notifList"></div>
+</div>
+
+<div class="scrim" id="scrim" onclick="if(event.target===this)closeModal()"><div class="modal" id="modal"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* =========================== DATA =========================== */
+const QUEUE = {
+  calls:{waiting:7,longest:"4:12",aht:"5:20",ahtTarget:"6:00",sl:74,slTarget:80,aband:"5.1%"},
+  email:{queue:31,oldest:"2h 40m",slaMet:96,unassigned:6,touchless:22}
+};
+const QUEUEC = {
+  "All":          {calls:{waiting:7,longest:"4:12",aht:"5:20",ahtTarget:"6:00",sl:74,slTarget:80,aband:"5.1%"}, email:{queue:31,oldest:"2h 40m",slaMet:96,unassigned:6,touchless:22}},
+  "Defence":      {calls:{waiting:4,longest:"4:12",aht:"7:30",ahtTarget:"6:00",sl:74,slTarget:80,aband:"6.2%"}, email:{queue:14,oldest:"2h 40m",slaMet:92,unassigned:3,touchless:18}},
+  "AGFMA":        {calls:{waiting:0,longest:"0:22",aht:"2:50",ahtTarget:"6:00",sl:93,slTarget:80,aband:"1.1%"}, email:{queue:3,oldest:"22m",slaMet:99,unassigned:0,touchless:34}},
+  "Homes QLD":    {calls:{waiting:2,longest:"2:40",aht:"5:10",ahtTarget:"6:00",sl:81,slTarget:80,aband:"3.4%"}, email:{queue:9,oldest:"1h 30m",slaMet:95,unassigned:2,touchless:20}},
+  "Infringements":{calls:{waiting:1,longest:"1:50",aht:"4:20",ahtTarget:"6:00",sl:79,slTarget:80,aband:"4.0%"}, email:{queue:5,oldest:"55m",slaMet:96,unassigned:1,touchless:16}},
+};
+
+const WOS = {
+  unassigned:[
+    {id:"WO-DEF-88455",desc:"Aircon fault — Mess hall",contract:"Defence",pri:"p2",due:"22 Jun 2026, 13:30",age:"35 min"},
+    {id:"WO-INF-20688",desc:"Damaged signage — depot entrance",contract:"Infringements",pri:"p3",due:"26 Jun 2026, 12:00",age:"2h",absent:true},
+    {id:"WO-DEF-88460",desc:"Blocked drain — ablutions block C",contract:"Defence",pri:"p2",due:"22 Jun 2026, 15:00",age:"12 min"},
+    {id:"WO-HOM-31255",desc:"Leaking tap — Unit 9C",contract:"Homes QLD",pri:"p3",due:"25 Jun 2026, 17:00",age:"1h"},
+    {id:"WO-AGF-50122",desc:"Stairwell light out — Level 2",contract:"AGFMA",pri:"p3",due:"24 Jun 2026, 09:00",age:"20 min"},
+  ],
+  atrisk:[
+    {id:"WO-DEF-88390",desc:"Power outage — Bldg 3 comms room",contract:"Defence",pri:"p2",mins:72,due:"22 Jun 2026, 11:14",
+     reason:"Technician on site, required part not in stock — ETA unconfirmed",case:null},
+    {id:"WO-HOM-31190",desc:"No heating — Unit 14B",contract:"Homes QLD",pri:"p2",mins:70,due:"22 Jun 2026, 11:12",
+     reason:"Field status stalled — 'Parts ordered' for 3 days with no update",case:"CASE-HOM-7781"},
+    {id:"WO-INF-20644",desc:"Pothole — main access road",contract:"Infringements",pri:"p2",mins:124,due:"22 Jun 2026, 12:06",
+     reason:"Dispatched 45 min ago, contractor has not accepted",case:"CASE-INF-3320"},
+  ],
+  jeopardy:[
+    {id:"WO-DEF-88421",desc:"No hot water — Holsworthy Bldg 7",contract:"Defence",pri:"p1",mins:28,due:"22 Jun 2026, 10:30",
+     reason:"Contractor rejected late — no cover assigned yet",
+     happened:"Dispatched to MetroFM at 09:09 and rejected at 09:31 with no reason captured. ~80 personnel affected, and no replacement is assigned — the restore window is closing fast.",
+     case:"CASE-DEF-1042",customer:"Site facilities lead"},
+    {id:"WO-DEF-88361",desc:"Hot water plant failure — Bldg 9",contract:"Defence",pri:"p1",mins:-65,due:"22 Jun 2026, 08:57",
+     reason:"Required parts unavailable — on order, ETA past SLA",
+     happened:"Technician attended and isolated a failed circulation pump, but the replacement isn't in stock. Supplier ETA is Thursday — beyond the restore SLA. The customer needs a revised commitment and an interim hot-water arrangement.",
+     case:null,customer:"Bldg 9 facilities"},
+    {id:"WO-HOM-31204",desc:"Roof leak — Unit 22B",contract:"Homes QLD",pri:"p2",mins:-30,due:"22 Jun 2026, 09:32",
+     reason:"Rework needed — first repair didn't hold, contractor returning",
+     happened:"The contractor closed the job, but the leak recurred within hours of leaving site. Rework is required and the contractor is booked to return tomorrow morning, which pushes past the make-safe SLA.",
+     case:null,customer:"Tenant 22B"},
+  ],
+  inprogress:[
+    {id:"WO-AGF-50140",desc:"Stairwell light replacement — Level 2",contract:"AGFMA",pri:"p3",due:"22 Jun 2026, 15:00",
+     progress:"Technician on site since 11:10 — work underway",case:null},
+    {id:"WO-DEF-88410",desc:"HVAC service — Admin block",contract:"Defence",pri:"p2",due:"22 Jun 2026, 16:30",
+     progress:"Contractor en route — ETA 13:45",case:null},
+    {id:"WO-HOM-31220",desc:"Window repair — Unit 7A",contract:"Homes QLD",pri:"p3",due:"25 Jun 2026, 12:00",
+     progress:"On site — assessing, parts on the van",case:null},
+    {id:"WO-INF-20670",desc:"Line marking — main car park",contract:"Infringements",pri:"p3",due:"24 Jun 2026, 10:00",
+     progress:"Crew on site, marking in progress",case:null},
+  ]
+};
+
+const REJECTIONS=[
+  {who:"MetroFM Pty Ltd",wo:"WO-DEF-88421",pri:"p1",ago:"22 min ago",reason:"No reason given"},
+  {who:"Coastal Trades",wo:"WO-INF-20601",pri:"p3",ago:"1 hr ago",reason:"Outside service area"},
+  {who:"BrightSpark Electrical",wo:"WO-HOM-31144",pri:"p2",ago:"2 hr ago",reason:"No availability"},
+];
+const AVAIL=[
+  {name:"NorthSide Mechanical",status:"free",meta:"HVAC · 6.2 km · 2 techs free · compliant",act:"assign"},
+  {name:"Apex Electrical",status:"free",meta:"Electrical · 9.4 km · 1 tech free · compliant",act:"assign"},
+  {name:"MetroFM Pty Ltd",status:"busy",meta:"Multi-trade · 3.1 km · just rejected WO-DEF-88421",act:"reject"},
+  {name:"J. Okafor (internal)",status:"off",meta:"Plumbing · same-day sick — SAP leave synced 11:04",act:"leave"},
+];
+
+const CASES={
+ "CASE-DEF-1042":{
+  id:"CASE-DEF-1042",wo:"WO-DEF-88421",customer:"Bldg 7 Facilities — Holsworthy",contract:"Defence",
+  pri:"p1",fault:"No hot water — ablution block, ~80 personnel affected",asset:"FL: HOLS-B7-PLUMB-02",
+  origin:"Inbound call",due:"22 Jun 2026, 10:30",slaText:"28 min",slaLabel:"to SLA breach",slaReason:"Original contractor rejected; re-dispatch pending acceptance.",stageIdx:4,trackIdx:3,trackStatus:"In transit",
+  timeline:[
+    {t:"09:02",src:"genesys",title:"Inbound call received",body:"Caller identified from CLI. 2 prior calls and 1 open work order surfaced before the first question.",reason:"Asset ID unknown (~90% of Defence callers) — functional location proposed from caller history."},
+    {t:"09:05",src:"sap",title:"Case created · CASE-DEF-1042",body:"Fault captured and classified P1 in SAP Service Cloud, generated directly from the call with no re-entry.",reason:"P1 driven by personnel impact (~80 affected) — priority logic applied automatically."},
+    {t:"09:06",src:"sap",title:"Work order raised · WO-DEF-88421",body:"WO generated from the case. Mandatory fields and Defence formatting enforced at creation."},
+    {t:"09:09",src:"fsm",title:"Dispatched to MetroFM Pty Ltd",body:"FSM proposed the contractor on proximity and skill match. Sent for acceptance."},
+    {t:"09:31",src:"fsm",alert:true,title:"Contractor rejected",body:"MetroFM rejected the job 22 minutes after dispatch.",reason:"No reason captured at source. SLA window now 28 min — automatically flagged to the jeopardy engine."},
+    {t:"09:33",src:"spog",title:"Coordination note added · RM → CX",body:"\"Re-routing to NorthSide, calling them direct. Hold customer comms until accepted.\" Visible to RM and CX — durable in the case, not in Teams."},
+  ],
+  notes:[
+    {who:"S. Patel · RM",vis:"RM + CX",t:"09:33",body:"Re-routing to NorthSide, calling direct. Hold customer comms until accepted."},
+    {who:"A. Lee · CX",vis:"All VOC",t:"09:12",body:"Caller is site facilities lead — wants an ETA call-back, not SMS."},
+  ],
+  lastComms:{when:"09:09",text:"\"Your request status changed to: Dispatched\""}
+ },
+ "CASE-DEF-1009":{
+  id:"CASE-DEF-1009",wo:"WO-DEF-88207",customer:"Bldg 12 — Base Operations",contract:"Defence",
+  pri:"p1",fault:"Security door fault — main entry access control offline",asset:"FL: HOLS-B12-ACCESS-01",
+  origin:"After-hours call",due:"20 Jun 2026, 21:00",slaText:"Missed",slaLabel:"by 1h 30m · now closed",missedBy:"1h 30m",slaReason:"After-hours completion didn't sync to SAP/FSM; only caught and closed Monday.",stageIdx:8,trackIdx:4,trackStatus:"On site",
+  timeline:[
+    {t:"Sat 18:40",src:"genesys",title:"After-hours call received",body:"Access control offline at Bldg 12 main entry. Caller: base duty officer."},
+    {t:"Sat 18:43",src:"sap",title:"Case created · CASE-DEF-1009",body:"Classified P1 — site security impact."},
+    {t:"Sat 18:44",src:"sap",title:"Work order raised · WO-DEF-88207",body:"WO generated from the case."},
+    {t:"Sat 19:05",src:"fsm",title:"Dispatched to SecureTech",body:"On-call security contractor accepted at 19:20."},
+    {t:"Sat 22:30",src:"fsm",title:"Marked complete in the field",body:"Contractor closed the job on the FSM mobile app after restoring access control."},
+    {t:"Mon 08:05",src:"spog",alert:true,title:"State mismatch detected",body:"Field showed complete, but SAP/FSM still read 'Dispatched'. SPOG flagged the gap on Monday's exception sweep.",reason:"The weekend completion never synced — the job sat in limbo and the SLA looked breached."},
+    {t:"Mon 08:20",src:"spog",title:"Coordination note · RM",body:"\"Confirming closure with base ops and backdating completion to Saturday.\""},
+    {t:"Mon 08:25",src:"fsm",ext:"Field Supervisor",title:"Completion confirmed",body:"T. Nguyen (Field Supervisor) confirmed the job was completed Sat 22:30. The confirmation flows into the case — VOC records it, it isn't authored by the team leader or RM."},
+    {t:"Mon 08:40",src:"sap",title:"Case closed",body:"Completion backdated to Sat 22:30, with the supervisor's confirmation and the miss reason attached as the audit record. SLA recorded as missed by 1h 30m."},
+  ],
+  notes:[
+    {who:"S. Patel · RM",vis:"RM + CX",t:"Mon 08:20",body:"Confirming closure with base ops, backdating to Sat 22:30."},
+  ],
+  lastComms:{when:"Mon 08:45",text:"\"Your job has been completed and closed.\""}
+ }
+};
+let currentCaseId="CASE-DEF-1042";
+
+/* case lifecycle list for the Cases lens */
+const CSTATUS={
+  unassigned:{label:"Unassigned",cls:"st-un",c:"#8a94a6"},
+  pending:{label:"Pending approval",cls:"st-pa",c:"#6b46c1"},
+  created:{label:"Work Order Created",cls:"st-wc",c:"#2f6fde"},
+  inprogress:{label:"In progress",cls:"st-ip",c:"#1d7a4d"},
+  onhold:{label:"On Hold",cls:"st-oh",c:"#b5740a"},
+  cancelled:{label:"Cancelled",cls:"st-cx",c:"#cf3a31"},
+  completed:{label:"Completed",cls:"st-cp",c:"#9aa3b2"},
+};
+const CSTATUS_ORDER=["unassigned","pending","created","inprogress","onhold","cancelled","completed"];
+const DUE_LABEL={overdue:"Overdue",today:"Today",week:"This week",later:"Later"};
+const CASELIST=[
+  {id:"CASE-INF-3320",desc:"Pothole — main access road",cust:"Council depot",contract:"Infringements",pri:"p2",status:"unassigned",due:"22 Jun 2026, 18:00",dueBucket:"today"},
+  {id:"CASE-DEF-1051",desc:"Aircon fault — Mess hall",cust:"Bldg 4",contract:"Defence",pri:"p2",status:"pending",due:"23 Jun 2026, 09:00",dueBucket:"week"},
+  {id:"CASE-INF-3301",desc:"Damaged signage — depot entrance",cust:"Council depot",contract:"Infringements",pri:"p3",status:"unassigned",due:"26 Jun 2026, 12:00",dueBucket:"week"},
+  {id:"CASE-DEF-1042",desc:"No hot water — Holsworthy Bldg 7",cust:"Bldg 7 Facilities",contract:"Defence",pri:"p1",status:"inprogress",due:"22 Jun 2026, 10:30",dueBucket:"today",soon:true},
+  {id:"CASE-AGF-2210",desc:"Stairwell light out — Level 2",cust:"AGFMA site",contract:"AGFMA",pri:"p3",status:"created",due:"22 Jun 2026, 15:00",dueBucket:"today"},
+  {id:"CASE-DEF-1033",desc:"Power outage — Bldg 3 comms",cust:"Bldg 3",contract:"Defence",pri:"p2",status:"inprogress",due:"22 Jun 2026, 14:00",dueBucket:"today",soon:true},
+  {id:"CASE-HOM-7799",desc:"Leaking tap — Unit 9C",cust:"Tenant 9C",contract:"Homes QLD",pri:"p3",status:"created",due:"25 Jun 2026, 17:00",dueBucket:"week"},
+  {id:"CASE-HOM-7781",desc:"No heating — Unit 14B",cust:"Tenant 14B",contract:"Homes QLD",pri:"p2",status:"onhold",due:"22 Jun 2026, 16:00",dueBucket:"today",soon:true},
+  {id:"CASE-HOM-7760",desc:"Hot water leak — Unit 3A",cust:"Tenant 3A",contract:"Homes QLD",pri:"p2",status:"onhold",due:"22 Jun 2026, 09:30",dueBucket:"overdue",over:true},
+  {id:"CASE-AGF-2188",desc:"Door closer repair — foyer",cust:"AGFMA site",contract:"AGFMA",pri:"p3",status:"cancelled",due:"21 Jun 2026, 16:00",dueBucket:"later"},
+  {id:"CASE-DEF-1009",desc:"Security door fault — Bldg 12",cust:"Base Operations",contract:"Defence",pri:"p1",status:"completed",due:"20 Jun 2026, 21:00",dueBucket:"later",missed:true},
+];
+
+/* =========================== STATE =========================== */
+let role="lead", view="command", ctx={};
+let state={bucket:"jeopardy", q:"", contract:"all", pri:"all", queueContract:"All", lens:"wo", caseStatus:"all", dueFilter:"any"};
+const NAVS={
+  lead:[["command","Command view","▦"],["case","Case timeline","◷"],["comms","Customer comms","✉"]],
+  rm:[["jeopardy","Jeopardy &amp; dispatch","⚠"],["case","Case timeline","◷"],["avail","Resource availability","☷"]],
+  cx:[["lookup","Status lookup","🔎"],["case","Case timeline","◷"]],
+};
+const DEF={lead:"command",rm:"jeopardy",cx:"lookup"};
+
+function setRole(r){role=r;view=DEF[r];ctx={};state.bucket=r==="lead"?"jeopardy":"jeopardy";state.q="";state.contract="all";state.pri="all";
+  document.querySelectorAll(".role-btn").forEach(b=>b.classList.toggle("active",b.dataset.role===r));render();}
+function go(v,c={}){view=v;ctx=c;render();window.scrollTo({top:0,behavior:"smooth"});}
+function renderNav(){document.getElementById("nav").innerHTML=NAVS[role].map(([v,l,i])=>
+  `<a href="#" class="${v===view?'on':''}" onclick="event.preventDefault();go('${v}')"><span class="ico">${i}</span>${l}</a>`).join("");}
+function crumb(t){document.getElementById("crumb").innerHTML=t;}
+
+function render(){
+  renderNav(); renderNotif();
+  const c=document.getElementById("content");
+  if(view==="command")c.innerHTML=viewCommand();
+  else if(view==="queue")c.innerHTML=viewQueue();
+  else if(view==="jeopardy")c.innerHTML=viewJeopardy();
+  else if(view==="case")c.innerHTML=viewCase();
+  else if(view==="comms")c.innerHTML=viewComms();
+  else if(view==="avail")c.innerHTML=viewAvail();
+  else if(view==="lookup")c.innerHTML=viewLookup();
+}
+
+/* =========================== HELPERS =========================== */
+function tier(m){return m<0?"breached":m<=30?"critical":m<=90?"warning":"watch";}
+function fmt(m){if(m<0)return "BREACHED";const h=Math.floor(m/60),mm=m%60;return (h>0?h+"h ":"")+mm+"m";}
+function clockCls(m){return m<0||m<=30?"red":m<=90?"amber":"green";}
+
+const LEGEND=`<div class="legend">
+  <span class="li"><span class="tag native">●</span> Native to SPOG</span>
+  <span class="li"><span class="tag sync">◆</span> Writes back to source</span>
+  <span class="li"><span class="tag open">↗</span> Opens source record</span>
+</div>`;
+
+/* breach band — highest hierarchy, the item closest to breach */
+function breachBand(){
+  const live=WOS.jeopardy.filter(j=>j.mins>0).sort((a,b)=>a.mins-b.mins)[0];
+  if(!live)return "";
+  return `<div class="breach">
+    <div>
+      <div class="ey"><span class="pdot"></span>Breach imminent · intervene now</div>
+      <h2>${live.desc}</h2>
+      <div class="why">${live.reason}. <span class="muted">${live.id} · ${live.contract}</span></div>
+      <div class="meta"><span class="pill ${live.pri}">${live.pri.toUpperCase()}</span><span class="chip">${live.contract}</span><span class="chip">Late rejection</span></div>
+    </div>
+    <div class="clockwrap"><div class="clk" id="heroClock">${pad(live.mins)}</div><div class="clk-l">to SLA breach</div></div>
+    <div class="acts">
+      <button class="btn danger" onclick="openRedispatch('${live.id}')">Re-dispatch now <span class="ic">↗</span></button>
+      <button class="btn" onclick="toast('Calling ${live.customer||'customer'}…','Genesys click-to-dial')">Call customer</button>
+      <button class="btn" onclick="toast('Escalated to duty manager','SPOG · escalation logged')">Escalate</button>
+      <button class="btn ghost" onclick="go('case',{id:'${live.case}'})">View case ↗</button>
+    </div>
+  </div>`;
+}
+function pad(m){const mm=String(m).padStart(2,"0");return mm+":00";}
+
+/* proactive alert: WOs approaching their SLA window */
+function slaAlertBar(){
+  const n=WOS.atrisk.length; if(!n)return "";
+  const soon=WOS.atrisk.filter(w=>w.mins<=90).length;
+  return `<div class="slabar"><span class="si">⏱</span>
+    <div><b>${n} work order${n>1?'s':''} approaching SLA</b> — ${soon} within the next 90 minutes. Act before they breach.</div>
+    <button class="btn sm" onclick="setBucket('atrisk')">Review at-risk (${n})</button></div>`;
+}
+
+/* live ticking on the hero clock */
+let heroSecs=null,heroTimer=null;
+function startHeroClock(){
+  const el=document.getElementById("heroClock"); if(!el){clearInterval(heroTimer);return;}
+  if(heroSecs===null)heroSecs=28*60-6;
+  clearInterval(heroTimer);
+  heroTimer=setInterval(()=>{const e=document.getElementById("heroClock");if(!e){clearInterval(heroTimer);return;}
+    heroSecs=Math.max(0,heroSecs-1);const m=Math.floor(heroSecs/60),s=heroSecs%60;
+    e.textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");},1000);
+}
+
+/* =========================== TEAM LEADER: WORK ORDERS =========================== */
+function viewCommand(){
+  crumb(`<b>Command view</b> · all contracts`);
+  return `
+  <div class="page-head"><h1>Command view</h1></div>
+  <p class="page-sub">Your live queues and everything in flight across contracts — in one place.</p>
+  ${breachBand()}
+  ${slaAlertBar()}
+  <div class="section-label">Queue health<span class="ln"></span><span class="srcbadge genesys">Genesys</span></div>
+  <div id="queueWrap">${queueHealth()}</div>
+  <div class="section-label">Work in flight<span class="ln"></span></div>
+  ${lensToggle()}
+  ${toolbar()}
+  ${state.lens==="cases"
+    ? `<div id="casesWrap">${renderCasesLens()}</div>`
+    : `${segments()}<div class="wolist" id="woList">${renderWOList()}</div>`}
+  ${LEGEND}`;
+}
+
+function toolbar(){
+  const casesExtra = state.lens==="cases" ? `
+    <div class="fsel">Due
+      <select onchange="state.dueFilter=this.value;saveFilters();fillActive()">
+        ${[["any","Any due"],["overdue","Overdue"],["today","Today"],["week","This week"],["later","Later"]].map(([v,l])=>`<option value="${v}" ${state.dueFilter===v?"selected":""}>${l}</option>`).join("")}
+      </select></div>
+    <div class="fsel">Status
+      <select onchange="state.caseStatus=this.value;saveFilters();fillActive()">
+        <option value="all" ${state.caseStatus==="all"?"selected":""}>Any status</option>
+        ${CSTATUS_ORDER.map(s=>`<option value="${s}" ${state.caseStatus===s?"selected":""}>${CSTATUS[s].label}</option>`).join("")}
+      </select></div>` : "";
+  return `<div class="toolbar" style="margin-top:14px">
+    <div class="search-lg">🔎<input id="q" value="${state.q}" oninput="onSearch(this.value)" placeholder="Search work order, case, customer, asset…"></div>
+    <div class="fsel">Contract
+      <select onchange="state.contract=this.value;saveFilters();fillActive()">
+        ${["all","Defence","AGFMA","Homes QLD","Infringements"].map(c=>`<option value="${c}" ${state.contract===c?"selected":""}>${c==="all"?"All":c}</option>`).join("")}
+      </select></div>
+    <div class="fsel">Priority
+      <select onchange="state.pri=this.value;saveFilters();fillActive()">
+        ${["all","p1","p2","p3"].map(p=>`<option value="${p}" ${state.pri===p?"selected":""}>${p==="all"?"All":p.toUpperCase()}</option>`).join("")}
+      </select></div>
+    ${casesExtra}
+    <span class="rescount" id="rescount"></span>
+  </div>`;
+}
+/* sticky filters across sessions */
+function saveFilters(){try{localStorage.setItem("voc.filters",JSON.stringify({contract:state.contract,pri:state.pri,dueFilter:state.dueFilter,caseStatus:state.caseStatus}));}catch(e){}}
+function loadFilters(){try{const s=JSON.parse(localStorage.getItem("voc.filters")||"{}");
+  if(s.contract)state.contract=s.contract; if(s.pri)state.pri=s.pri; if(s.dueFilter)state.dueFilter=s.dueFilter; if(s.caseStatus)state.caseStatus=s.caseStatus;}catch(e){}}
+function clearCaseFilters(){state.contract="all";state.pri="all";state.dueFilter="any";state.caseStatus="all";state.q="";saveFilters();render();}
+function clearFilter(type){if(type==="contract")state.contract="all";else if(type==="pri")state.pri="all";else if(type==="due")state.dueFilter="any";else if(type==="status")state.caseStatus="all";saveFilters();render();}
+function ftoken(label,fn){return `<span class="ftoken">${label}<button class="ftx" onclick="${fn}">✕</button></span>`;}
+function activeFilterChips(){
+  const t=[];
+  if(state.contract!=="all")t.push(ftoken("Contract: "+state.contract,"clearFilter('contract')"));
+  if(state.pri!=="all")t.push(ftoken("Priority: "+state.pri.toUpperCase(),"clearFilter('pri')"));
+  if(state.dueFilter!=="any")t.push(ftoken("Due: "+(DUE_LABEL[state.dueFilter]||state.dueFilter),"clearFilter('due')"));
+  if(state.caseStatus!=="all")t.push(ftoken("Status: "+CSTATUS[state.caseStatus].label,"clearFilter('status')"));
+  if(!t.length)return "";
+  return `<div class="ftokens"><span class="ftlabel">Filters</span>${t.join("")}<button class="btn sm ghost" onclick="clearCaseFilters()">Clear all</button></div>`;
+}
+function lensToggle(){
+  const woTotal=WOS.unassigned.length+WOS.atrisk.length+WOS.jeopardy.length;
+  return `<div class="seg lens">
+    <button class="${state.lens==="wo"?"on":""}" onclick="setLens('wo')">Work orders <span class="cnt">${woTotal}</span></button>
+    <button class="${state.lens==="cases"?"on":""}" onclick="setLens('cases')">Cases <span class="cnt">${CASELIST.length}</span></button>
+  </div>`;
+}
+function setLens(l){state.lens=l;render();startHeroClock();}
+function onSearch(v){state.q=v;fillActive();}
+function fillActive(){if(state.lens==="cases")fillCases();else fillWO();}
+function segments(){
+  const u=WOS.unassigned.length,a=WOS.atrisk.length,j=WOS.jeopardy.length,p=WOS.inprogress.length;
+  const ip = role==="rm" ? `<button class="b-ip ${state.bucket==='inprogress'?'on':''}" onclick="setBucket('inprogress')">In progress <span class="cnt">${p}</span></button>` : "";
+  return `<div class="seg">
+    <button class="b-un ${state.bucket==='unassigned'?'on':''}" onclick="setBucket('unassigned')">Unassigned <span class="cnt">${u}</span></button>
+    ${ip}
+    <button class="b-risk ${state.bucket==='atrisk'?'on':''}" onclick="setBucket('atrisk')">At risk <span class="cnt">${a}</span></button>
+    <button class="b-jeop ${state.bucket==='jeopardy'?'on':''}" onclick="setBucket('jeopardy')">In jeopardy <span class="cnt">${j}</span></button>
+  </div>`;
+}
+function setBucket(b){state.bucket=b;render();startHeroClock();}
+function fillWO(){const el=document.getElementById("woList");if(el)el.innerHTML=renderWOList();}
+
+/* ----- Cases lens (status pipeline + table) ----- */
+function casesFilteredBase(){
+  const q=state.q.trim().toLowerCase();
+  return CASELIST.filter(c=>
+    (state.contract==="all"||c.contract===state.contract)&&
+    (state.pri==="all"||c.pri===state.pri)&&
+    (!q||(c.id+" "+c.desc+" "+c.cust+" "+c.contract).toLowerCase().includes(q)));
+}
+function setCaseStatus(s){state.caseStatus=s;saveFilters();fillCases();}
+function fillCases(){const el=document.getElementById("casesWrap");if(el)el.innerHTML=renderCasesLens();}
+function renderCasesLens(){
+  const rows=casesFilteredBase().filter(c=>
+    (state.caseStatus==="all"||c.status===state.caseStatus)&&
+    (state.dueFilter==="any"||c.dueBucket===state.dueFilter));
+  const rc=document.getElementById("rescount"); if(rc)rc.textContent=`${rows.length} of ${CASELIST.length} cases`;
+  return activeFilterChips() + (rows.length
+    ? `<div class="card" style="margin-top:14px"><table class="cases">
+        <colgroup><col style="width:30%"><col style="width:14%"><col style="width:10%"><col style="width:16%"><col style="width:22%"><col style="width:8%"></colgroup>
+        <thead><tr><th>Case</th><th>Contract</th><th>Priority</th><th>Due</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows.map(caseRow).join("")}</tbody></table></div>`
+    : `<div class="card" style="margin-top:14px"><div class="cases-empty">No cases match these filters.<button class="btn sm" onclick="clearCaseFilters()">Clear filters</button></div></div>`);
+}
+function caseRow(c){
+  const dueStyle=c.over?'style="color:var(--red);font-weight:700"':(c.soon?'style="color:var(--amber);font-weight:600"':"");
+  return `<tr class="crow click" onclick="go('case',{id:'${c.id}'})">
+    <td><div class="crow-desc">${c.desc}</div><div class="crow-id">${c.id} · ${c.cust}</div></td>
+    <td><span class="chip">${c.contract}</span></td>
+    <td><span class="pill ${c.pri}">${c.pri.toUpperCase()}</span></td>
+    <td ${dueStyle}>${c.over?'⚠ ':''}${c.due}</td>
+    <td><span class="stp ${CSTATUS[c.status].cls}">${CSTATUS[c.status].label}</span>${c.missed?'<span class="stp" style="background:var(--red-soft);color:var(--red);margin-left:6px">SLA missed</span>':""}</td>
+    <td class="c-act" onclick="event.stopPropagation()">${actMenu(`m-cs-${c.id}`,
+      mHead("Open")+mItem("◷","View timeline",`go('case',{id:'${c.id}'})`)+
+      `<div class="mdiv"></div>`+
+      mHead("Act")+mItem("✉","Update customer",`openComms('${c.id}')`)+mItem("✎","Add note",`openNote('${c.id}')`)+
+      (c.status==="unassigned"?mItem("↗","Assign in FSM",`openRedispatch('${c.id}')`):"")+
+      (c.status!=="completed"&&c.status!=="cancelled"?mItem("✕","Cancel work order",`openCancel('${c.id}')`,true):""))}</td>
+  </tr>`;
+}
+
+function filterList(list){
+  const q=state.q.trim().toLowerCase();
+  return list.filter(w=>
+    (state.contract==="all"||w.contract===state.contract)&&
+    (state.pri==="all"||w.pri===state.pri)&&
+    (!q||(w.id+" "+w.desc+" "+w.contract).toLowerCase().includes(q)));
+}
+function renderWOList(){
+  const list=filterList(WOS[state.bucket]);
+  const rc=document.getElementById("rescount"); if(rc)rc.textContent=`${list.length} of ${WOS[state.bucket].length} shown`;
+  if(!list.length)return `<div class="card"><div style="padding:26px;text-align:center;color:var(--ink-3)">No matching work orders. Adjust the search or filters.</div></div>`;
+  if(state.bucket==="unassigned")return list.map(woUnassigned).join("");
+  if(state.bucket==="atrisk")return list.map(woAtRisk).join("");
+  if(state.bucket==="inprogress")return list.map(woInProgress).join("");
+  return list.map(woJeopardy).join("");
+}
+
+/* structured action dropdown */
+function mHead(t){return `<div class="mh">${t}</div>`;}
+function mItem(ic,label,fn,danger){return `<button class="mi ${danger?'danger':''}" onclick="closeMenus();${fn}"><span class="mic">${ic}</span>${label}</button>`;}
+function actMenu(menuId,inner){return `<div class="actbar"><button class="btn sm" onclick="toggleMenu('${menuId}',event)">Actions ▾</button><div class="menu" id="${menuId}">${inner}</div></div>`;}
+function toggleMenu(id,ev){ev.stopPropagation();const m=document.getElementById(id);const open=m.classList.contains("show");closeMenus();if(!open)m.classList.add("show");}
+function closeMenus(){document.querySelectorAll(".menu.show").forEach(x=>x.classList.remove("show"));}
+document.addEventListener("click",e=>{if(!e.target.closest(".actbar"))closeMenus();});
+
+function woUnassigned(w){return `<div class="wo ${w.pri}">
+  <div class="wo-top">
+    <span class="pill ${w.pri}">${w.pri.toUpperCase()}</span>
+    <div class="lead"><div class="wo-id">${w.id}</div><div class="wo-desc">${w.desc}</div></div>
+    <div class="wo-right"><div class="wo-due">${w.due}</div><div class="wo-clock-l">due · unassigned ${w.age}</div></div>
+  </div>
+  <div class="wo-foot">
+    <span class="chip">${w.contract}</span>
+    ${w.absent?'<span class="chip absent">from absent colleague</span>':''}
+    ${actMenu(`m-un-${w.id}`,
+      mHead("Dispatch")+mItem("↗","Assign in FSM",`openRedispatch('${w.id}')`)+
+      `<div class="mdiv"></div>`+
+      mHead("Internal")+mItem("✎","Add note",`openNote('${w.id}')`)+mItem("✕","Cancel work order",`openCancel('${w.id}')`,true))}
+  </div></div>`;
+}
+function woAtRisk(w){const cls=clockCls(w.mins);return `<div class="wo ${w.pri}">
+  <div class="wo-top">
+    <span class="pill ${w.pri}">${w.pri.toUpperCase()}</span>
+    <div class="lead"><div class="wo-id">${w.id}</div><div class="wo-desc">${w.desc}</div></div>
+    <div class="wo-right"><div class="wo-clock ${cls}">${fmt(w.mins)}</div><div class="wo-clock-l">to SLA breach</div></div>
+  </div>
+  <div class="reason"><span class="rk">Why at risk:</span><span>${w.reason}</span></div>
+  <div class="wo-foot">
+    <span class="chip">${w.contract}</span>
+    <span class="wo-due-chip">Due ${w.due}</span>
+    ${actMenu(`m-ar-${w.id}`,
+      mHead("Dispatch")+
+      mItem("↗","Re-dispatch in FSM",`openRedispatch('${w.id}')`)+
+      mItem("⤓","Seek field update",`seekFieldUpdate('${w.id}')`)+
+      `<div class="mdiv"></div>`+
+      mHead("Customer")+mItem("✉","Contact customer",`openComms('${w.id}')`)+
+      `<div class="mdiv"></div>`+
+      mHead("Internal")+
+      (w.case?mItem("◷","View case history",`go('case',{id:'${w.case}'})`):"")+
+      mItem("▲","Escalate",`toast('Escalated · ${w.id}','SPOG · escalation logged')`)+
+      mItem("✎","Add note",`openNote('${w.id}')`)+
+      mItem("✕","Cancel work order",`openCancel('${w.id}')`,true))}
+  </div></div>`;
+}
+function woJeopardy(w){const br=w.mins<0;return `<div class="wo ${w.pri}">
+  <div class="wo-top">
+    <span class="pill ${w.pri}">${w.pri.toUpperCase()}</span>
+    <div class="lead"><div class="wo-id">${w.id}</div><div class="wo-desc">${w.desc}</div></div>
+    <div class="wo-right"><div class="wo-clock red">${br?"BREACHED":fmt(w.mins)}</div><div class="wo-clock-l">${br?"needs recovery":"to SLA breach"}</div></div>
+  </div>
+  <div class="reason jeop"><span class="rk">Reason:</span><span>${w.reason}</span></div>
+  <div class="happened"><b>What happened — </b>${w.happened}</div>
+  <div class="wo-foot">
+    <span class="chip">${w.contract}</span>
+    <span class="wo-due-chip">Due ${w.due}</span>
+    ${actMenu(`m-jp-${w.id}`,
+      mHead("Customer")+mItem("☎","Call customer",`toast('Calling ${w.customer}…','Genesys click-to-dial')`,true)+
+      `<div class="mdiv"></div>`+
+      mHead("Dispatch")+
+      mItem("↗","Re-dispatch in FSM",`openRedispatch('${w.id}')`)+
+      mItem("⤓","Seek field update",`seekFieldUpdate('${w.id}')`)+
+      `<div class="mdiv"></div>`+
+      mHead("Internal")+
+      (w.case?mItem("◷","View case history",`go('case',{id:'${w.case}'})`):"")+
+      mItem("✓","Clear with reason code",`openAck('${w.id}')`)+
+      mItem("✎","Add note",`openNote('${w.id}')`)+
+      mItem("✕","Cancel work order",`openCancel('${w.id}')`,true))}
+  </div></div>`;
+}
+function woInProgress(w){return `<div class="wo ${w.pri}">
+  <div class="wo-top">
+    <span class="pill ${w.pri}">${w.pri.toUpperCase()}</span>
+    <div class="lead"><div class="wo-id">${w.id}</div><div class="wo-desc">${w.desc}</div></div>
+    <div class="wo-right"><span class="stp st-ip">In progress</span></div>
+  </div>
+  <div class="reason" style="border-left-color:var(--green)"><span class="rk">Field status:</span><span>${w.progress}</span></div>
+  <div class="wo-foot">
+    <span class="chip">${w.contract}</span>
+    <span class="wo-due-chip">Due ${w.due}</span>
+    ${actMenu(`m-ip-${w.id}`,
+      mHead("Dispatch")+mItem("⤓","Seek field update",`seekFieldUpdate('${w.id}')`)+
+      `<div class="mdiv"></div>`+
+      mHead("Customer")+mItem("✉","Contact customer",`openComms('${w.id}')`)+
+      `<div class="mdiv"></div>`+
+      mHead("Internal")+
+      (w.case?mItem("◷","View case history",`go('case',{id:'${w.case}'})`):"")+
+      mItem("✎","Add note",`openNote('${w.id}')`)+
+      mItem("✕","Cancel work order",`openCancel('${w.id}')`,true))}
+  </div></div>`;
+}
+
+/* =========================== QUEUE HEALTH (reusable component) =========================== */
+function pSec(t){const p=t.split(":").map(Number);return p[0]*60+(p[1]||0);}
+function queueHealth(){
+  const sel=state.queueContract, q=QUEUEC[sel]||QUEUEC.All;
+  const slC=q.calls.sl>=q.calls.slTarget?"good":(q.calls.slTarget-q.calls.sl<=6?"warn":"bad");
+  const ahtC=pSec(q.calls.aht)<=pSec(q.calls.ahtTarget)?"good":(pSec(q.calls.aht)-pSec(q.calls.ahtTarget)<=60?"warn":"bad");
+  const waitC=q.calls.waiting===0?"good":(q.calls.waiting<=3?"warn":"bad");
+  const abN=parseFloat(q.calls.aband), abC=abN<2?"good":(abN<5?"warn":"bad");
+  const slaC=q.email.slaMet>=97?"good":(q.email.slaMet>=92?"warn":"bad");
+  const unC=q.email.unassigned===0?"good":(q.email.unassigned<=2?"warn":"bad");
+  return `<div class="card">
+    <div class="card-h"><h2>Live now${sel!=="All"?" · "+sel:""}</h2><span class="srcbadge genesys">Genesys</span>
+      <div class="fsel" style="margin-left:auto">Contract
+        <select onchange="state.queueContract=this.value;fillQueue()">
+          ${["All","Defence","AGFMA","Homes QLD","Infringements"].map(c=>`<option value="${c}" ${sel===c?"selected":""}>${c==="All"?"All contracts":c}</option>`).join("")}
+        </select></div>
+    </div>
+    <div class="qgrid">
+      <div class="qcol"><h3>📞 Calls</h3>
+        <div class="qrow"><span class="qk">Calls waiting</span><span class="qv ${waitC}">${q.calls.waiting}</span></div>
+        <div class="qrow"><span class="qk">Longest wait</span><span class="qv">${q.calls.longest}</span></div>
+        <div class="qrow"><span class="qk">Avg handle time</span><span class="qv ${ahtC}">${q.calls.aht} <span class="t">vs ${q.calls.ahtTarget} target</span></span></div>
+        <div class="qrow"><span class="qk">Service level (20s)</span><span class="qv ${slC}">${q.calls.sl}% <span class="t">vs ${q.calls.slTarget}%</span></span></div>
+        <div class="qrow"><span class="qk">Abandonment</span><span class="qv ${abC}">${q.calls.aband}</span></div>
+      </div>
+      <div class="qcol"><h3>✉ Email</h3>
+        <div class="qrow"><span class="qk">In queue</span><span class="qv">${q.email.queue}</span></div>
+        <div class="qrow"><span class="qk">Oldest unactioned</span><span class="qv">${q.email.oldest}</span></div>
+        <div class="qrow"><span class="qk">Response SLA met</span><span class="qv ${slaC}">${q.email.slaMet}%</span></div>
+        <div class="qrow"><span class="qk">Unassigned (absent staff)</span><span class="qv ${unC}">${q.email.unassigned}</span></div>
+        <div class="qrow"><span class="qk">Straight-through (touchless)</span><span class="qv good">${q.email.touchless}%</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+function fillQueue(){const el=document.getElementById("queueWrap");if(el)el.innerHTML=queueHealth();}
+function viewQueue(){
+  crumb(`<b>Queue health</b> · live`);
+  return `<div class="page-head"><h1>Queue health</h1></div>
+  <p class="page-sub">The live call and email pulse — the wallboard, in the pane.</p><div id="queueWrap">${queueHealth()}</div>`;
+}
+
+/* =========================== RM JEOPARDY + DISPATCH =========================== */
+function viewJeopardy(){
+  crumb(`<b>Jeopardy &amp; dispatch</b> · live`);
+  return `
+  <div class="page-head"><h1>Jeopardy &amp; dispatch</h1></div>
+  <p class="page-sub">Catch a job at risk before the SLA window closes — clock, reason and next action in one place.</p>
+  ${breachBand()}
+  ${slaAlertBar()}
+  ${toolbar()}
+  ${segments()}
+  <div class="grid-2" style="margin-top:4px">
+    <div class="wolist" id="woList">${renderWOList()}</div>
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-h"><h2>Rejections</h2><span class="srcbadge fsm">FSM</span><span class="ct">flagged instantly</span></div>
+        <div>${REJECTIONS.map(r=>`<div class="rj"><div class="ri">✕</div><div style="flex:1">
+          <div><b>${r.who}</b> rejected <span style="font-family:var(--mono);font-size:11px">${r.wo}</span> <span class="pill ${r.pri}" style="margin-left:3px">${r.pri.toUpperCase()}</span></div>
+          <div class="rt">${r.ago} · ${r.reason}</div>
+          <button class="btn sm" style="margin-top:9px" onclick="openRedispatch('${r.wo}')">Re-dispatch in FSM <span class="ic">↗</span></button>
+          </div></div>`).join("")}</div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Available now</h2><span class="srcbadge fsm">FSM</span><span class="srcbadge sap">SAP leave</span></div>
+        <div>${AVAIL.map(a=>`<div class="av"><div><div class="an"><span class="sd ${a.status}"></span>${a.name}</div><div class="am">${a.meta}</div></div>
+          <div>${a.act==="assign"?'<button class="btn sm pri">Assign</button>':a.act==="leave"?'<span class="chip absent">leave · live</span>':a.act==="reject"?'<span class="chip" style="background:var(--red-soft);color:var(--red)">rejected</span>':'<span class="chip">busy</span>'}</div></div>`).join("")}</div>
+      </div>
+    </div>
+  </div>
+  ${LEGEND}`;
+}
+
+/* =========================== CASE TIMELINE =========================== */
+const STAGES=["Receive","Triage","Create WO","Dispatch","Track / SLA","Updates","Close","Post-close"];
+function tracker(k){
+  const idx=(k.trackIdx!=null)?k.trackIdx:2;
+  const s3=k.trackStatus||"In progress";
+  const hold=/hold/i.test(s3);
+  const labels=["Case logged","Work order","Dispatched",s3,"Completed"];
+  const last=labels.length-1;
+  const fill=(idx/last)*100;
+  return `<div class="track">
+    <div class="track-line"><div class="track-fill" data-target="${fill}"></div></div>
+    <div class="track-steps">
+      ${labels.map((l,i)=>{
+        const cls = i<idx ? "done" : (i===idx ? (i===last?"done last":("current"+(hold&&i===3?" hold":""))) : "future");
+        const ic = (i<idx || (i===idx&&i===last)) ? "✓" : (i===idx ? "●" : (i+1));
+        const sub = i<idx ? "" : (i===idx ? (i===last?"closed":"now") : "");
+        return `<div class="tstep ${cls}"><div class="tnode2">${ic}</div><div class="tlabel">${l}</div><div class="tsub">${sub}</div></div>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+function viewCase(){
+  currentCaseId = (ctx.id && CASES[ctx.id]) ? ctx.id : "CASE-DEF-1042";
+  const k=CASES[currentCaseId];
+  crumb(`<a href="#" onclick="event.preventDefault();go('${DEF[role]}')">${role==='rm'?'Jeopardy':role==='cx'?'Lookup':'Work orders'}</a> · <b>${k.id}</b>`);
+  const tl=k.timeline.slice().reverse().map(e=>`
+    <div class="tev ${e.alert?'alert':''}">
+      <div class="tnode ${e.src}">${e.src==='genesys'?'☎':e.src==='sap'?'▣':e.src==='fsm'?'⚒':'●'}</div>
+      <div class="tcard">
+        <div class="th"><span class="ttime">${e.t}</span><span class="srcbadge ${e.src}">${e.src==='spog'?'SPOG':e.src.toUpperCase()}</span><span class="ttitle">${e.alert?'⚠ ':''}${e.title}</span>${e.ext?`<span class="chip" style="margin-left:auto;background:var(--green-soft);color:var(--green)">✓ confirmed · ${e.ext}</span>`:''}</div>
+        <div class="tbody">${e.body}</div>
+        ${e.reason?`<div class="treason"><b>Reason — </b>${e.reason}</div>`:''}
+      </div>
+    </div>`).join("");
+  const notes=k.notes.map(n=>`<div class="note"><div class="nh"><span class="who">${n.who}</span><span class="vis">${n.vis}</span><span class="nt">${n.t}</span></div><div class="nb">${n.body}</div></div>`).join("");
+  return `
+  <button class="back" onclick="go('${DEF[role]}')">← Back</button>
+  <div class="case-head">
+    <div class="r1"><span class="pill ${k.pri}">${k.pri.toUpperCase()}</span><h1>${k.fault}</h1>
+      <span class="sla"><div class="big ${k.slaTone||''}">${k.slaText}</div><div class="l">${k.slaLabel||'to SLA breach'}</div></span></div>
+    <div class="r2">
+      <div class="kv"><div class="kk">Case / WO</div><div class="vv cid">${k.id} · ${k.wo}</div></div>
+      <div class="kv"><div class="kk">Customer</div><div class="vv">${k.customer}</div></div>
+      <div class="kv"><div class="kk">Contract</div><div class="vv">${k.contract}</div></div>
+      <div class="kv"><div class="kk">Due</div><div class="vv">${k.due||'—'}</div></div>
+      ${k.missedBy?`<div class="kv"><div class="kk">Missed SLA by</div><div class="vv" style="color:var(--red)">${k.missedBy}</div></div>`:''}
+      <div class="kv"><div class="kk">Asset</div><div class="vv">${k.asset}</div></div>
+      <div class="kv"><div class="kk">Origin</div><div class="vv">${k.origin}</div></div>
+    </div>
+    ${k.slaReason?`<div class="reason ${k.missedBy?'jeop':''}" style="margin-top:12px"><span class="rk">Reason:</span><span>${k.slaReason}</span></div>`:''}
+    ${tracker(k)}
+    <div class="case-acts">
+      ${actMenu(`m-case-${k.wo}`,
+        mHead("Customer")+mItem("✉","Update customer",`openComms('${k.wo}')`)+
+        `<div class="mdiv"></div>`+
+        mHead("Dispatch")+mItem("↗","Re-dispatch in FSM",`openRedispatch('${k.wo}')`)+mItem("⤓","Seek field update",`seekFieldUpdate('${k.wo}')`)+
+        `<div class="mdiv"></div>`+
+        mHead("Manage")+mItem("◆","Change priority",`openPriority()`)+mItem("✎","Add note",`document.getElementById('noteText').focus()`)+
+        `<div class="mdiv"></div>`+
+        mHead("Open source")+mItem("↗","Open in SAP",`toast('Opening SAP Service Cloud','SAP ↗')`)+mItem("↗","Open in FSM",`toast('Opening SAP FSM','FSM ↗')`)+
+        `<div class="mdiv"></div>`+
+        mItem("✕","Cancel work order",`openCancel('${k.wo}')`,true))}
+    </div>
+  </div>
+  <div class="case-wrap">
+    <div class="card">
+      <div class="card-h"><h2>Case timeline</h2><span class="tag native">●</span><span class="ct">the audit trail · newest first</span><button class="btn sm" style="margin-left:10px" onclick="openExport('${k.id}')"><span class="ic">⤓</span> Export history</button></div>
+      <div style="padding:16px 18px"><div class="timeline">${tl}</div></div>
+    </div>
+    <div class="side">
+      <div class="card">
+        <div class="card-h"><h2>Coordination notes</h2><span class="tag native">●</span></div>
+        <div id="caseNotes">${notes}</div>
+        <div class="note-form">
+          <textarea id="noteText" rows="2" placeholder="Add a coordination note…"></textarea>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="fld" id="noteVis" style="flex:1"><option>RM + CX</option><option>All VOC</option><option>Team leaders only</option></select>
+            <button class="btn pri sm" onclick="submitCaseNote()">Submit</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Customer comms</h2></div>
+        <div class="comms">
+          <div class="muted" style="font-size:11px;margin-bottom:5px">Last sent · ${k.lastComms.when} <span class="srcbadge sap">SAP</span></div>
+          <div>${k.lastComms.text} <span class="meaningless">status code — not meaningful</span></div>
+          <button class="btn pri sm" style="margin-top:11px" onclick="openComms('${k.wo}')"><span class="ic">◆</span> Compose meaningful update</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =========================== COMMS / AVAIL / LOOKUP =========================== */
+function viewComms(){
+  crumb(`<b>Customer comms</b> · proactive`);
+  const jobs=[
+    {wo:"WO-HOM-31190",cust:"Homes QLD — Unit 14B",ev:"Parts ordered 3 days ago, no update sent",eta:"ETA Thu 14:00"},
+    {wo:"WO-DEF-88421",cust:"Bldg 7 — Holsworthy",ev:"Re-dispatched after rejection",eta:"New contractor en route"},
+    {wo:"WO-INF-20644",cust:"Council depot",ev:"Awaiting acceptance — possible delay",eta:"Confirm by 13:00"},
+  ];
+  return `<div class="page-head"><h1>Customer comms orchestration</h1></div>
+  <p class="page-sub">40–50% of inbound calls are people chasing jobs. Compose meaningful, proactive updates from live field data — the decision sits here, the send stays in SAP.</p>
+  <div class="card"><div class="card-h"><h2>Changed in the field — customer not yet told</h2><span class="tag sync">◆ sends via SAP / AusPost</span></div>
+  <div>${jobs.map(j=>`<div class="av"><div><div class="an">${j.cust} <span style="font-family:var(--mono);font-size:11px;color:var(--ink-3)">${j.wo}</span></div><div class="am">${j.ev} · <b>${j.eta}</b></div></div><button class="btn sm pri" onclick="openComms('${j.wo}')">Compose update</button></div>`).join("")}</div></div>`;
+}
+function viewAvail(){
+  crumb(`<b>Resource availability</b>`);
+  return `<div class="page-head"><h1>Resource availability</h1></div>
+  <p class="page-sub">Contractor capacity, technician skills, location and leave in one view — instead of Power BI matrices, spreadsheets, Google Maps and a whiteboard.</p>
+  <div class="card"><div class="card-h"><h2>Contractors &amp; technicians</h2><span class="srcbadge fsm">FSM</span><span class="srcbadge sap">SAP leave · real-time</span></div>
+  <div>${AVAIL.map(a=>`<div class="av"><div><div class="an"><span class="sd ${a.status}"></span>${a.name}</div><div class="am">${a.meta}</div></div><div>${a.status==='free'?'<button class="btn sm pri">Assign</button>':'<button class="btn sm" disabled style="opacity:.45">Unavailable</button>'}</div></div>`).join("")}</div></div>`;
+}
+function viewLookup(){
+  crumb(`<b>Status lookup</b> · drop-in`);
+  const k=CASES["CASE-DEF-1042"];
+  return `<div class="page-head"><h1>Status lookup</h1></div>
+  <p class="page-sub">A customer is on the phone about a job. Find it, see where it's up to, and act — without leaving for another system.</p>
+  <div class="lookup-bar"><span class="mag">🔎</span><input class="lookup-input" value="WO-DEF-88421" onkeydown="if(event.key==='Enter')go('case',{id:'CASE-DEF-1042'})" placeholder="Search by WO, case, customer name, address or phone…"><button class="btn pri" onclick="go('case',{id:'CASE-DEF-1042'})">Look up</button></div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="card-h"><span class="pill p1">P1</span><h2>WO-DEF-88421 — No hot water, Holsworthy</h2><span class="ct">Bldg 7 Facilities · Defence</span></div>
+    <div style="padding:16px 18px">
+      ${tracker(k)}
+      <div class="reason" style="margin-top:18px;border-left-color:var(--green)"><span class="rk">Live status:</span><span>Original contractor rejected; re-dispatched to NorthSide Mechanical, who have <b>accepted</b> and are <b>en route — ETA 35 min</b>. SLA on track after intervention.</span></div>
+      <div class="lookup-acts">
+        <button class="btn pri" onclick="openCustomerChoice('WO-DEF-88421')">Update customer</button>
+        <button class="btn" onclick="go('case',{id:'CASE-DEF-1042'})">View timeline</button>
+        <button class="btn" onclick="openReassign('WO-DEF-88421')">Reassign</button>
+        <button class="btn" onclick="toast('Escalated · WO-DEF-88421','SPOG · escalation logged')">Escalate</button>
+        <button class="btn" onclick="openCustomerRecord('CASE-DEF-1042')">View full customer record</button>
+        <button class="btn cancel-btn" onclick="openCancel('WO-DEF-88421')">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+}
+function openCustomerChoice(id){
+  modal(`<div class="modal-h"><h3>Update customer — ${id}</h3><p>How would you like to reach them?</p></div>
+  <div class="modal-b" style="flex-direction:row;gap:11px">
+    <button class="btn pri" style="flex:1;justify-content:center;padding:16px" onclick="closeModal();openComms('${id}')"><span class="ic">✉</span> Email / SMS update</button>
+    <button class="btn" style="flex:1;justify-content:center;padding:16px" onclick="closeModal();toast('Calling customer…','Genesys click-to-dial')"><span class="ic">☎</span> Call customer</button>
+  </div>
+  <div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button></div>`);
+}
+function openReassign(id){
+  modal(`<div class="modal-h"><h3>Reassign ${id}</h3><p>Hand this case to another coordinator or team. Ownership updates in SAP.</p></div>
+  <div class="modal-b"><div class="field"><label>Reassign to</label><select class="fld"><option>A. Lee — CX Coordinator</option><option>S. Patel — RM</option><option>Defence pod</option><option>Homes QLD pod</option></select></div>
+  <div class="field"><label>Note (optional)</label><textarea rows="2" placeholder="Context for the new owner…"></textarea></div></div>
+  <div class="modal-f"><span class="nl"><span class="tag sync">◆ SAP · ownership updated</span></span><button class="btn" onclick="closeModal()">Cancel</button>
+  <button class="btn pri" onclick="closeModal();toast('Case reassigned','SAP Service Cloud · ownership updated')">Reassign</button></div>`);
+}
+function openCustomerRecord(id){
+  modal(`<div class="modal-h"><h3>Customer record</h3><p>Aggregated 360 view — surfaced from SAP, not re-keyed here.</p></div>
+  <div class="modal-b">
+    <div class="r2" style="display:flex;gap:24px;flex-wrap:wrap">
+      <div class="kv"><div class="kk">Customer</div><div class="vv">Bldg 7 Facilities — Holsworthy</div></div>
+      <div class="kv"><div class="kk">Contract</div><div class="vv">Defence</div></div>
+      <div class="kv"><div class="kk">Primary contact</div><div class="vv">Site facilities lead</div></div>
+      <div class="kv"><div class="kk">Preference</div><div class="vv">ETA call-back (not SMS)</div></div>
+    </div>
+    <div><div class="kk" style="margin-bottom:6px">Open jobs (3)</div>
+      <div style="font-size:12.5px;color:var(--ink-2);line-height:1.7">
+        WO-DEF-88421 · No hot water — <b>in progress</b><br>
+        WO-DEF-88390 · Power outage Bldg 3 — at risk<br>
+        WO-DEF-88455 · Aircon Mess hall — unassigned
+      </div></div>
+    <div><div class="kk" style="margin-bottom:6px">Recent interactions</div>
+      <div style="font-size:12.5px;color:var(--ink-2);line-height:1.7">Today 09:02 · inbound call (this job)<br>Last week · 2 calls, 1 closed WO</div></div>
+  </div>
+  <div class="modal-f"><span class="nl"><span class="tag open">↗ full record in SAP</span></span><button class="btn" onclick="closeModal()">Close</button>
+  <button class="btn pri" onclick="closeModal();toast('Opening full customer record','SAP ↗')">Open in SAP ↗</button></div>`);
+}
+
+/* =========================== NOTIFICATIONS =========================== */
+function allAlerts(){
+  return [...WOS.jeopardy,...WOS.atrisk].map(w=>({...w,t:tier(w.mins)}))
+    .sort((a,b)=>a.mins-b.mins);
+}
+function renderNotif(){
+  const a=allAlerts(); const crit=a.filter(x=>x.t==="critical"||x.t==="breached").length;
+  document.getElementById("notifBadge").textContent=a.length;
+  document.querySelector(".bell .ping").style.display=crit?"block":"none";
+  document.getElementById("notifSub").textContent=crit?`${crit} need action now`:"";
+  document.getElementById("notifList").innerHTML=a.map(w=>{
+    const clk=w.mins<0?"BREACHED":fmt(w.mins);
+    const cc=w.mins<0||w.mins<=30?"red":w.mins<=90?"amber":"";
+    return `<div class="nrow ${w.t}" onclick="closeNotif();${w.case?`go('case',{id:'${w.case}'})`:`go('${DEF[role]}')`}">
+      <div class="nbar"></div>
+      <div style="flex:1;min-width:0">
+        <div class="ntitle">${w.desc}</div>
+        <div class="nmeta">${w.reason}</div>
+        <span class="ntier ${w.t}">${w.t==="breached"?"Breached":w.t==="critical"?"Critical":w.t==="warning"?"Warning":"Watch"}</span>
+      </div>
+      <div class="nclock ${cc}">${clk}<div style="font-size:9px;color:var(--ink-3);font-family:var(--sans);font-weight:500;margin-top:3px">${w.pri.toUpperCase()} · ${w.contract}</div></div>
+    </div>`;
+  }).join("");
+}
+function toggleNotif(e){e.stopPropagation();document.getElementById("notif").classList.toggle("show");}
+function closeNotif(){document.getElementById("notif").classList.remove("show");}
+document.addEventListener("click",e=>{const n=document.getElementById("notif");if(n.classList.contains("show")&&!n.contains(e.target)&&!e.target.closest(".bell"))closeNotif();});
+
+/* =========================== MODALS =========================== */
+const REASONS=["Contractor rejection","No contractor availability","Parts / materials delay","Access not granted on site","Incorrect priority at creation","Weekend / after-hours coverage gap","Customer reschedule"];
+function modal(h){document.getElementById("modal").innerHTML=h;document.getElementById("scrim").classList.add("show");}
+function closeModal(){document.getElementById("scrim").classList.remove("show");}
+
+function openNote(id){
+  modal(`<div class="modal-h"><h3>Add note — ${id}</h3><p>Captured in the work order and visible to the roles you choose. Durable — not a Teams message that disappears.</p></div>
+  <div class="modal-b">
+    <div class="field"><label>Note <span class="req">*</span></label><textarea id="mNote" rows="3" placeholder="What's happening / what you've done…"></textarea></div>
+    <div class="field"><label>Visible to</label><select class="fld" id="mVis"><option>RM + CX</option><option>All VOC</option><option>Team leaders only</option></select></div>
+  </div>
+  <div class="modal-f"><span class="nl"><span class="tag native">● logged to case</span></span>
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn pri" onclick="(function(){var t=document.getElementById('mNote').value.trim();if(!t){toast('Type a note first','');return;}closeModal();toast('Note submitted · '+document.getElementById('mVis').value,'SPOG · in the work order');})()">Submit</button></div>`);
+}
+function openAck(id){
+  modal(`<div class="modal-h"><h3>Clear jeopardy — ${id}</h3><p>A structured reason is required before this closes — turning jeopardy from a running cost into performance data.</p></div>
+  <div class="modal-b"><div class="field"><label>Root-cause reason code <span class="req">*</span></label><select class="fld">${REASONS.map(r=>`<option>${r}</option>`).join("")}</select></div>
+  <div class="field"><label>Commentary (optional)</label><textarea rows="2"></textarea></div></div>
+  <div class="modal-f"><span class="nl"><span class="tag sync">◆ SAP + scorecard</span></span><button class="btn" onclick="closeModal()">Cancel</button>
+  <button class="btn pri" onclick="closeModal();toast('Jeopardy cleared with reason code','SAP Service Cloud · scorecard updated')">Log &amp; clear</button></div>`);
+}
+function openRedispatch(id){
+  modal(`<div class="modal-h"><h3>Re-dispatch ${id}</h3><p>Hands off to SAP FSM scheduling, which recommends the next-best available subcontractors — ranked by proximity, availability, skills, compliance and performance. The pane surfaces the need; FSM does the scheduling.</p></div>
+  <div class="modal-b">
+    <div style="background:var(--blue-soft);border:1px solid #cfe0fa;border-radius:8px;padding:11px 13px">
+      <div style="font-size:10.5px;font-weight:700;color:#21528f;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">FSM scheduling</div>
+      <div style="font-size:12.5px;color:var(--ink-2)">2 compliant subcontractors available within 10 km right now. FSM ranks the next-best options and re-routes automatically on a further rejection.</div>
+    </div>
+  </div>
+  <div class="modal-f"><span class="nl"><span class="tag open">↗ opens SAP FSM scheduling</span></span><button class="btn" onclick="closeModal()">Cancel</button>
+  <button class="btn pri" onclick="closeModal();toast('Opening SAP FSM scheduling — next-best subcontractors','SAP FSM ↗ · scheduling')">Open FSM scheduling ↗</button></div>`);
+}
+function seekFieldUpdate(id){toast('Field update requested · '+id+' — contractor notified','SAP FSM · awaiting response');}
+function openPriority(){
+  modal(`<div class="modal-h"><h3>Change priority</h3><p>Priority drives SLA logic. The original caller is notified of the revised timeframe automatically.</p></div>
+  <div class="modal-b"><div class="field"><label>New priority</label><select class="fld"><option>P1 — 4 hr response</option><option>P2 — 24 hr</option><option>P3 — 5 day</option></select></div>
+  <div class="field"><label>Reason</label><input class="fld" placeholder="e.g. personnel impact reassessed"></div></div>
+  <div class="modal-f"><span class="nl"><span class="tag sync">◆ SAP + caller notified</span></span><button class="btn" onclick="closeModal()">Cancel</button>
+  <button class="btn pri" onclick="closeModal();toast('Priority updated · caller notified','SAP Service Cloud')">Save</button></div>`);
+}
+function openComms(id){
+  modal(`<div class="modal-h"><h3>Compose customer update</h3><p>Drafted from live field status — the reason and a real ETA, not just a status code.</p></div>
+  <div class="modal-b"><div class="field"><label>Channel (customer preference)</label><select class="fld"><option>Phone call-back (flagged preference)</option><option>SMS</option><option>Email</option></select></div>
+  <div class="field"><label>Message — auto-drafted, edit before sending</label><textarea rows="4">Hi, an update on your no-hot-water request at Bldg 7. The first contractor was unavailable, so we've reassigned it to NorthSide Mechanical, now en route — ETA ~35 min. We'll confirm once they're on site. No action needed from you.</textarea></div></div>
+  <div class="modal-f"><span class="nl"><span class="tag sync">◆ sends via SAP / AusPost</span></span><button class="btn" onclick="closeModal()">Cancel</button>
+  <button class="btn pri" onclick="closeModal();toast('Proactive update sent to customer','SAP Service Cloud · logged to case')">Send update</button></div>`);
+}
+function openCancel(id){
+  modal(`<div class="modal-h"><h3>Cancel ${id}?</h3><p>Are you sure you want to cancel this work order? The customer will be notified that it won't proceed. This can't be undone.</p></div>
+  <div class="modal-f" style="justify-content:flex-end"><button class="btn" onclick="closeModal()">No, keep it</button>
+  <button class="btn danger" onclick="cancelConfirmed('${id}')">Yes, cancel</button></div>`);
+}
+function cancelConfirmed(id){
+  document.getElementById("modal").innerHTML=`
+    <div class="modal-h"><h3>Work order cancelled</h3></div>
+    <div class="modal-b"><div style="display:flex;gap:11px;align-items:flex-start">
+      <div style="width:30px;height:30px;border-radius:50%;background:var(--green-soft);color:var(--green);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">✓</div>
+      <div><div style="font-weight:600">${id} has been cancelled.</div>
+      <div style="font-size:12.5px;color:var(--ink-2);margin-top:3px">The customer has been notified that this job won't proceed, and the cancellation has synced to SAP.</div></div>
+    </div></div>
+    <div class="modal-f"><span class="nl"><span class="tag sync">◆ SAP · customer notified</span></span><button class="btn pri" onclick="closeModal()">Done</button></div>`;
+}
+function openExport(id){
+  modal(`<div class="modal-h"><h3>Export case history — ${id}</h3><p>The timeline is the audit trail: every event with its source system, timestamp and actor. Export it as a compliance-ready record.</p></div>
+  <div class="modal-b">
+    <div class="field"><label>Format</label><select class="fld"><option>PDF — audit pack (formatted)</option><option>CSV — event log</option><option>JSON — full record</option></select></div>
+    <div class="field"><label>Scope</label><select class="fld"><option>Full case history</option><option>Decisions &amp; coordination notes only</option><option>Customer communications only</option></select></div>
+    <div style="font-size:11.5px;color:var(--ink-2);background:#fafbfc;border:1px solid var(--line-2);border-radius:7px;padding:9px 11px">Includes the supervisor completion confirmation and every cross-system event, in sequence.</div>
+  </div>
+  <div class="modal-f"><span class="nl"><span class="tag native">● generated by SPOG</span></span><button class="btn" onclick="closeModal()">Cancel</button>
+  <button class="btn pri" onclick="closeModal();toast('Case history exported — PDF audit pack','SPOG · ${id}')">Export</button></div>`);
+}
+function submitCaseNote(){
+  const t=document.getElementById("noteText").value.trim();const vis=document.getElementById("noteVis").value;
+  if(!t){toast('Type a note first','');return;}
+  const k=CASES[currentCaseId];
+  k.notes.unshift({who:"You · "+(role==='rm'?'RM':role==='cx'?'CX':'Team Lead'),vis,t:"now",body:t});
+  document.getElementById("caseNotes").innerHTML=k.notes.map(n=>`<div class="note"><div class="nh"><span class="who">${n.who}</span><span class="vis">${n.vis}</span><span class="nt">${n.t}</span></div><div class="nb">${n.body}</div></div>`).join("");
+  document.getElementById("noteText").value="";
+  toast('Note submitted · visible to '+vis,'SPOG · in the work order');
+}
+
+/* =========================== TOASTS =========================== */
+function toast(msg,sys){const w=document.getElementById("toasts");const el=document.createElement("div");el.className="toast";
+  el.innerHTML=`<span class="td"></span><div>${msg}${sys?`<div class="sn">→ ${sys}</div>`:''}</div>`;w.appendChild(el);
+  setTimeout(()=>{el.style.transition="opacity .3s,transform .3s";el.style.opacity="0";el.style.transform="translateX(18px)";setTimeout(()=>el.remove(),300);},3400);}
+
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();closeNotif();closeMenus();}});
+
+/* boot */
+const _r=render; render=function(){_r();startHeroClock();animateTrack();};
+function animateTrack(){const f=document.querySelector(".track-fill");if(f)requestAnimationFrame(()=>{f.style.width=(f.dataset.target||0)+"%";});}
+loadFilters();
+render();
+</script>
+</body>
+</html>
